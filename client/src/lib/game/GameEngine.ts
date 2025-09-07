@@ -137,9 +137,21 @@ export class GameEngine {
     console.log('Player kicking ball');
     this.audioManager.playSound('hit');
     
-    // Calculate kick direction and power
-    const angle = Math.random() * Math.PI * 2;
-    const power = 150 + Math.random() * 100;
+    // Calculate kick direction from player input/facing
+    const aim = this.currentPlayer.getAimVector();
+    let ax = aim.dx;
+    let ay = aim.dy;
+    if (ax === 0 && ay === 0) {
+      // Fallback: towards attacking goal
+      ax = this.currentPlayer.team === 'home' ? 1 : -1;
+      ay = 0;
+    }
+    // Add slight aim randomness (±10 degrees)
+    const jitter = (Math.random() - 0.5) * (Math.PI / 9);
+    const baseAngle = Math.atan2(ay, ax);
+    const angle = baseAngle + jitter;
+    // Power with small variation
+    const power = 200 + Math.random() * 60;
     
     this.ball.kick(this.currentPlayer.x, this.currentPlayer.y, angle, power);
     this.switchToNearestPlayer();

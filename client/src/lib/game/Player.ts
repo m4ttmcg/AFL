@@ -39,6 +39,27 @@ export class Player {
     this.movement[direction] = active;
   }
 
+  public getAimVector(): { dx: number; dy: number } {
+    // Prefer live input if any key is pressed
+    let dx = (this.movement.right ? 1 : 0) + (this.movement.left ? -1 : 0);
+    let dy = (this.movement.down ? 1 : 0) + (this.movement.up ? -1 : 0);
+    const mag = Math.hypot(dx, dy);
+    if (mag > 0) {
+      return { dx: dx / mag, dy: dy / mag };
+    }
+    // Fallback to facing direction
+    switch (this.currentDirection) {
+      case 'up':
+        return { dx: 0, dy: -1 };
+      case 'down':
+        return { dx: 0, dy: 1 };
+      case 'left':
+        return { dx: -1, dy: 0 };
+      case 'right':
+        return { dx: 1, dy: 0 };
+    }
+  }
+
   public updateControlled(deltaTime: number) {
     this.vx = 0;
     this.vy = 0;
