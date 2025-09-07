@@ -11,6 +11,8 @@ export class Ball {
   private gravity: number = 300;
   private bounce: number = 0.6;
   private friction: number = 0.98;
+  public wasKicked: boolean = false;
+  public hasBouncedSinceKick: boolean = false;
 
   constructor(x: number, y: number) {
     this.x = x;
@@ -37,6 +39,10 @@ export class Ball {
         if (Math.abs(this.vz) < 20) {
           this.vz = 0;
         }
+        // Register that a bounce occurred after a kick
+        if (this.wasKicked) {
+          this.hasBouncedSinceKick = true;
+        }
       }
     }
     
@@ -58,6 +64,8 @@ export class Ball {
     this.vy = Math.sin(angle) * power;
     this.vz = power * 0.5; // Kick gives it some height
     this.z = 5;
+    this.wasKicked = true;
+    this.hasBouncedSinceKick = false;
   }
 
   public catch(atX: number, atY: number) {
@@ -67,6 +75,8 @@ export class Ball {
     this.vy = 0;
     this.vz = 0;
     this.z = 0;
+    this.wasKicked = false;
+    this.hasBouncedSinceKick = false;
   }
 
   public isInAir(): boolean {

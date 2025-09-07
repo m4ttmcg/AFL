@@ -6,7 +6,7 @@ import { Physics } from "./Physics";
 import { AI } from "./AI";
 import { AudioManager } from "./AudioManager";
 import { SpriteManager } from "./SpriteManager";
-import { Team } from "../stores/useFooty";
+import { Team, useFooty } from "../stores/useFooty";
 
 export class GameEngine {
   private ctx: CanvasRenderingContext2D;
@@ -23,6 +23,10 @@ export class GameEngine {
   private currentPlayer: Player | null = null;
   private gameTime: number = 0;
   private lastTime: number = 0;
+  private wasBallInside: boolean = true;
+  private audioUnlocked: boolean = false;
+  private prevBallX: number = 0;
+  private prevBallY: number = 0;
 
   constructor(ctx: CanvasRenderingContext2D, homeTeam: Team, awayTeam: Team) {
     this.ctx = ctx;
@@ -72,6 +76,11 @@ export class GameEngine {
   private bindEvents() {
     this.controls.onKeyDown = (key: string) => {
       console.log('Key pressed:', key);
+      if (!this.audioUnlocked) {
+        // Unlock audio on first user interaction
+        this.audioUnlocked = true;
+        this.audioManager.playBackgroundMusic();
+      }
       this.handleInput(key, true);
     };
     
@@ -129,9 +138,21 @@ export class GameEngine {
     console.log('Player kicking ball');
     this.audioManager.playSound('hit');
     
-    // Calculate kick direction and power
-    const angle = Math.random() * Math.PI * 2;
-    const power = 150 + Math.random() * 100;
+    // Calculate kick direction from player input/facing
+    const aim = this.currentPlayer.getAimVector();
+    let ax = aim.dx;
+    let ay = aim.dy;
+    if (ax === 0 && ay === 0) {
+      // Fallback: towards attacking goal
+      ax = this.currentPlayer.team === 'home' ? 1 : -1;
+      ay = 0;
+    }
+    // Add slight aim randomness (±10 degrees)
+    const jitter = (Math.random() - 0.5) * (Math.PI / 9);
+    const baseAngle = Math.atan2(ay, ax);
+    const angle = baseAngle + jitter;
+    // Power with small variation
+    const power = 200 + Math.random() * 60;
     
     this.ball.kick(this.currentPlayer.x, this.currentPlayer.y, angle, power);
     this.switchToNearestPlayer();
@@ -209,6 +230,8 @@ export class GameEngine {
     this.gameTime += deltaTime;
     
     // Update ball physics
+    this.prevBallX = this.ball.x;
+    this.prevBallY = this.ball.y;
     this.ball.update(deltaTime);
     
     // Update players
@@ -220,20 +243,188 @@ export class GameEngine {
         this.ai.updatePlayer(player, this.ball, this.players, deltaTime);
       }
       
-      // Keep players on field
-      player.x = Math.max(20, Math.min(this.ctx.canvas.width - 20, player.x));
-      player.y = Math.max(20, Math.min(this.ctx.canvas.height - 20, player.y));
+      // Keep players on oval field
+      const clamped = this.field.projectInside(player.x, player.y, 20);
+      player.x = clamped.x;
+      player.y = clamped.y;
     });
     
-    // Ball collision with field boundaries
-    if (this.ball.x < 0 || this.ball.x > this.ctx.canvas.width) {
-      this.ball.vx *= -0.5;
-      this.ball.x = Math.max(0, Math.min(this.ctx.canvas.width, this.ball.x));
+    // Scoring detection (must run before OOB to avoid false OOB)
+    if (this.checkScoringSegment()) {
+      // Reset OOB state so next frame proceeds normally
+      this.wasBallInside = true;
+      return;
     }
-    if (this.ball.y < 0 || this.ball.y > this.ctx.canvas.height) {
-      this.ball.vy *= -0.5;
-      this.ball.y = Math.max(0, Math.min(this.ctx.canvas.height, this.ball.y));
+
+    // Ball out-of-bounds detection on oval boundary
+    const { x: bx, y: by } = this.ball;
+    const isInsideNow = this.field.isInside(bx, by, this.ball.radius);
+    if (this.wasBallInside && !isInsideNow) {
+      const onEdge = this.field.projectInside(bx, by, this.ball.radius);
+      const { nx, ny } = this.field.normalAt(onEdge.x, onEdge.y);
+
+      // Check for scoring at ends before OOB handling
+      const ellipse = this.field.getEllipse();
+      const areas = this.field.getGoalAreas();
+      // Use normalized X on ellipse to detect tips irrespective of margin projection
+      const normX = (onEdge.x - ellipse.cx) / ellipse.rx;
+      const tipThreshold = 0.96; // near the ±rx extreme
+      let scored = false;
+
+      if (normX <= -tipThreshold) {
+        // Left end
+        if (onEdge.y >= areas.left.yGoalTop && onEdge.y <= areas.left.yGoalBottom) {
+          // Goal for away
+          useFooty.getState().addScore('away', 1, 0);
+          this.audioManager.playSound('success');
+          this.ball.catch(this.ctx.canvas.width / 2, this.ctx.canvas.height / 2);
+          scored = true;
+        } else if (onEdge.y >= areas.left.yBehindTop && onEdge.y <= areas.left.yBehindBottom) {
+          // Behind for away
+          useFooty.getState().addScore('away', 0, 1);
+          const inside = this.field.projectInside(areas.left.x + 20, onEdge.y, this.ball.radius);
+          this.ball.catch(inside.x, inside.y);
+          scored = true;
+        }
+      } else if (normX >= tipThreshold) {
+        // Right end
+        if (onEdge.y >= areas.right.yGoalTop && onEdge.y <= areas.right.yGoalBottom) {
+          // Goal for home
+          useFooty.getState().addScore('home', 1, 0);
+          this.audioManager.playSound('success');
+          this.ball.catch(this.ctx.canvas.width / 2, this.ctx.canvas.height / 2);
+          scored = true;
+        } else if (onEdge.y >= areas.right.yBehindTop && onEdge.y <= areas.right.yBehindBottom) {
+          // Behind for home
+          useFooty.getState().addScore('home', 0, 1);
+          const inside = this.field.projectInside(areas.right.x - 20, onEdge.y, this.ball.radius);
+          this.ball.catch(inside.x, inside.y);
+          scored = true;
+        }
+      }
+
+      if (!scored) {
+        // Treat as out on the full or standard OOB
+        this.ball.x = onEdge.x + nx * 2;
+        this.ball.y = onEdge.y + ny * 2;
+        this.ball.vx = 0;
+        this.ball.vy = 0;
+        this.ball.vz = 0;
+        this.ball.z = 0;
+
+        if (this.ball.wasKicked && !this.ball.hasBouncedSinceKick) {
+          this.audioManager.playVoice('oob_full', 'outta bounds. On the full');
+        }
+      }
+
+      // Reset kick tracking after leaving play (score or OOB)
+      this.ball.wasKicked = false;
+      this.ball.hasBouncedSinceKick = false;
     }
+    this.wasBallInside = isInsideNow;
+  }
+
+  private checkScoring(): boolean {
+    // Legacy check; kept as fallback but replaced by segment-based scoring.
+    const areas = this.field.getGoalAreas();
+    const bx = this.ball.x;
+    const by = this.ball.y;
+    const store = useFooty.getState();
+
+    // Left side scoring (away team)
+    if (this.prevBallX >= areas.left.x && bx < areas.left.x) {
+      if (by >= areas.left.yGoalTop && by <= areas.left.yGoalBottom) {
+        // Goal for away
+        store.addScore('away', 1, 0);
+        this.audioManager.playSound('success');
+        // Restart at centre
+        this.ball.catch(this.ctx.canvas.width / 2, this.ctx.canvas.height / 2);
+        return true;
+      } else if (by >= areas.left.yBehindTop && by <= areas.left.yBehindBottom) {
+        // Behind for away
+        store.addScore('away', 0, 1);
+        // Place ball just inside field near goal line for kick-in
+        const inside = this.field.projectInside(areas.left.x + 20, this.ctx.canvas.height / 2, this.ball.radius);
+        this.ball.catch(inside.x, by);
+        return true;
+      }
+    }
+
+    // Right side scoring (home team)
+    if (this.prevBallX <= areas.right.x && bx > areas.right.x) {
+      if (by >= areas.right.yGoalTop && by <= areas.right.yGoalBottom) {
+        // Goal for home
+        store.addScore('home', 1, 0);
+        this.audioManager.playSound('success');
+        // Restart at centre
+        this.ball.catch(this.ctx.canvas.width / 2, this.ctx.canvas.height / 2);
+        return true;
+      } else if (by >= areas.right.yBehindTop && by <= areas.right.yBehindBottom) {
+        // Behind for home
+        store.addScore('home', 0, 1);
+        const inside = this.field.projectInside(areas.right.x - 20, this.ctx.canvas.height / 2, this.ball.radius);
+        this.ball.catch(inside.x, by);
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  private checkScoringSegment(): boolean {
+    const areas = this.field.getGoalAreas();
+    const ax = this.prevBallX;
+    const ay = this.prevBallY;
+    const bx = this.ball.x;
+    const by = this.ball.y;
+    const store = useFooty.getState();
+
+    const crossesVertical = (xLine: number) => {
+      if (ax === bx) return null;
+      if ((ax - xLine) * (bx - xLine) > 0) return null; // both on same side
+      const t = (xLine - ax) / (bx - ax);
+      if (t < 0 || t > 1) return null;
+      const y = ay + t * (by - ay);
+      return { t, y };
+    };
+
+    // Left line (away scores)
+    const leftCross = crossesVertical(areas.left.x);
+    if (leftCross) {
+      const y = leftCross.y;
+      if (y >= areas.left.yGoalTop && y <= areas.left.yGoalBottom) {
+        store.addScore('away', 1, 0);
+        this.audioManager.playSound('success');
+        this.ball.catch(this.ctx.canvas.width / 2, this.ctx.canvas.height / 2);
+        return true;
+      }
+      if (y >= areas.left.yBehindTop && y <= areas.left.yBehindBottom) {
+        store.addScore('away', 0, 1);
+        const inside = this.field.projectInside(areas.left.x + 20, y, this.ball.radius);
+        this.ball.catch(inside.x, inside.y);
+        return true;
+      }
+    }
+
+    // Right line (home scores)
+    const rightCross = crossesVertical(areas.right.x);
+    if (rightCross) {
+      const y = rightCross.y;
+      if (y >= areas.right.yGoalTop && y <= areas.right.yGoalBottom) {
+        store.addScore('home', 1, 0);
+        this.audioManager.playSound('success');
+        this.ball.catch(this.ctx.canvas.width / 2, this.ctx.canvas.height / 2);
+        return true;
+      }
+      if (y >= areas.right.yBehindTop && y <= areas.right.yBehindBottom) {
+        store.addScore('home', 0, 1);
+        const inside = this.field.projectInside(areas.right.x - 20, y, this.ball.radius);
+        this.ball.catch(inside.x, inside.y);
+        return true;
+      }
+    }
+
+    return false;
   }
 
   public render() {

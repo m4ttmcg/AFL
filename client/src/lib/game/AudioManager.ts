@@ -70,6 +70,25 @@ export class AudioManager {
     console.log(`Audio ${this.isMuted ? 'muted' : 'unmuted'}`);
   }
 
+  public speak(text: string) {
+    if (this.isMuted) return;
+    try {
+      // Use Web Speech API if available in browser
+      const w = window as any;
+      if (typeof w !== 'undefined' && 'speechSynthesis' in w) {
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'en-AU';
+        utterance.rate = 1.0;
+        utterance.pitch = 1.0;
+        w.speechSynthesis.speak(utterance);
+      } else {
+        console.log('TTS not supported: ', text);
+      }
+    } catch (e) {
+      console.log('TTS error', e);
+    }
+  }
+
   public destroy() {
     this.stopBackgroundMusic();
     this.sounds.clear();

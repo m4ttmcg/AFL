@@ -39,6 +39,27 @@ export class Player {
     this.movement[direction] = active;
   }
 
+  public getAimVector(): { dx: number; dy: number } {
+    // Prefer live input if any key is pressed
+    let dx = (this.movement.right ? 1 : 0) + (this.movement.left ? -1 : 0);
+    let dy = (this.movement.down ? 1 : 0) + (this.movement.up ? -1 : 0);
+    const mag = Math.hypot(dx, dy);
+    if (mag > 0) {
+      return { dx: dx / mag, dy: dy / mag };
+    }
+    // Fallback to facing direction
+    switch (this.currentDirection) {
+      case 'up':
+        return { dx: 0, dy: -1 };
+      case 'down':
+        return { dx: 0, dy: 1 };
+      case 'left':
+        return { dx: -1, dy: 0 };
+      case 'right':
+        return { dx: 1, dy: 0 };
+    }
+  }
+
   public updateControlled(deltaTime: number) {
     this.vx = 0;
     this.vy = 0;
@@ -115,17 +136,33 @@ export class Player {
     // Try to use directional sprite if available
     if (this.spriteManager) {
       const sprite = this.spriteManager.getSpriteForTeamColorAndDirection(this.color, this.currentDirection);
-      if (sprite && sprite.complete) {
-        const spriteSize = 28; // Size to render the sprite
+      // If sprite is an HTMLImageElement, ensure it's loaded; canvases are always ready
+      const ready = !!sprite && (!(sprite instanceof Image) || (sprite as HTMLImageElement).complete);
+      if (ready && sprite) {
+        const spriteSize = 40; // Larger player sprite size
         
-        // Draw the directional sprite
-        ctx.drawImage(
-          sprite,
-          this.x - spriteSize / 2,
-          this.y - spriteSize / 2,
-          spriteSize,
-          spriteSize
-        );
+        // Draw the directional sprite, flipping for left to correct inversion
+        if (this.currentDirection === 'left') {
+          ctx.save();
+          ctx.translate(this.x, this.y);
+          ctx.scale(-1, 1);
+          ctx.drawImage(
+            sprite as CanvasImageSource,
+            -spriteSize / 2,
+            -spriteSize / 2,
+            spriteSize,
+            spriteSize
+          );
+          ctx.restore();
+        } else {
+          ctx.drawImage(
+            sprite as CanvasImageSource,
+            this.x - spriteSize / 2,
+            this.y - spriteSize / 2,
+            spriteSize,
+            spriteSize
+          );
+        }
         
         // Player number overlay
         ctx.fillStyle = this.textColor;
@@ -139,11 +176,11 @@ export class Player {
         
         // Controlled player indicator
         if (this.isControlled) {
-          ctx.strokeStyle = '#ffff00';
-          ctx.lineWidth = 3;
-          ctx.beginPath();
-          ctx.arc(this.x, this.y, 20, 0, Math.PI * 2);
-          ctx.stroke();
+        ctx.strokeStyle = '#ffff00';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, 26, 0, Math.PI * 2);
+        ctx.stroke();
         }
         return;
       }
@@ -152,7 +189,7 @@ export class Player {
     // Fallback to circle rendering if sprite not available
     ctx.fillStyle = this.color;
     ctx.beginPath();
-    ctx.arc(this.x, this.y, 12, 0, Math.PI * 2);
+    ctx.arc(this.x, this.y, 16, 0, Math.PI * 2);
     ctx.fill();
     
     // Player border
@@ -172,7 +209,7 @@ export class Player {
       ctx.strokeStyle = '#ffff00';
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.arc(this.x, this.y, 18, 0, Math.PI * 2);
+      ctx.arc(this.x, this.y, 22, 0, Math.PI * 2);
       ctx.stroke();
     }
   }

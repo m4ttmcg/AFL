@@ -1,5 +1,5 @@
 export class SpriteManager {
-  private sprites: Map<string, HTMLImageElement> = new Map();
+  private sprites: Map<string, CanvasImageSource> = new Map();
   private loadedCount: number = 0;
   private totalSprites: number = 0;
   private onAllLoaded?: () => void;
@@ -29,6 +29,9 @@ export class SpriteManager {
     Object.entries(spriteFiles).forEach(([name, path]) => {
       const img = new Image();
       img.onload = () => {
+        // Post-process to remove white background via chroma key
+        const processed = this.removeWhiteBackground(img);
+        this.sprites.set(name, processed);
         this.loadedCount++;
         if (this.loadedCount === this.totalSprites && this.onAllLoaded) {
           this.onAllLoaded();
@@ -42,15 +45,14 @@ export class SpriteManager {
         }
       };
       img.src = path;
-      this.sprites.set(name, img);
     });
   }
 
-  public getSprite(name: string): HTMLImageElement | null {
+  public getSprite(name: string): CanvasImageSource | null {
     return this.sprites.get(name) || null;
   }
 
-  public getSpriteForTeamColorAndDirection(color: string, direction: 'up' | 'down' | 'left' | 'right'): HTMLImageElement | null {
+  public getSpriteForTeamColorAndDirection(color: string, direction: 'up' | 'down' | 'left' | 'right'): CanvasImageSource | null {
     // Map team colors to sprite variants
     const colorLower = color.toLowerCase();
     let colorType = 'red'; // default
@@ -89,7 +91,7 @@ export class SpriteManager {
   }
 
   // Keep the old method for backwards compatibility, defaulting to 'down' direction
-  public getSpriteForTeamColor(color: string): HTMLImageElement | null {
+  public getSpriteForTeamColor(color: string): CanvasImageSource | null {
     return this.getSpriteForTeamColorAndDirection(color, 'down');
   }
 
@@ -103,5 +105,27 @@ export class SpriteManager {
     } else {
       this.onAllLoaded = callback;
     }
+  }
+
+  private removeWhiteBackground(img: HTMLImageElement): HTMLCanvasElement {
+    const canvas = document.createElement('canvas');
+    canvas.width = img.naturalWidth || img.width;
+    canvas.height = img.naturalHeight || img.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return canvas;
+    ctx.drawImage(img, 0, 0);
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+    const threshold = 245; // treat near-white as background
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      if (r >= threshold && g >= threshold && b >= threshold) {
+        data[i + 3] = 0; // transparent
+      }
+    }
+    ctx.putImageData(imageData, 0, 0);
+    return canvas;
   }
 }
