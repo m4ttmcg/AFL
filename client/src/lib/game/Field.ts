@@ -5,6 +5,7 @@ export class Field {
   private cy: number;
   private rx: number;
   private ry: number;
+  private pxPerM: number;
 
   constructor(width: number, height: number) {
     this.width = width;
@@ -14,6 +15,10 @@ export class Field {
     // Leave a small margin from canvas border
     this.rx = width / 2 - 10;
     this.ry = height / 2 - 10;
+    // Approximate AFL ground: 160m x 130m playing area (mid-range)
+    const mLength = 160;
+    const mWidth = 130;
+    this.pxPerM = Math.min((this.rx * 2) / mLength, (this.ry * 2) / mWidth);
   }
 
   public render(ctx: CanvasRenderingContext2D) {
@@ -28,33 +33,42 @@ export class Field {
     ctx.ellipse(this.cx, this.cy, this.rx, this.ry, 0, 0, Math.PI * 2);
     ctx.stroke();
 
-    // Center circle
+    // Centre circles (AFL ~5m and ~10m radius)
+    const r5 = this.px(5);
+    const r10 = this.px(10);
     ctx.beginPath();
-    ctx.arc(this.cx, this.cy, 50, 0, Math.PI * 2);
+    ctx.arc(this.cx, this.cy, r10, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(this.cx, this.cy, r5, 0, Math.PI * 2);
     ctx.stroke();
 
     // Center square (approximate 50x50m representation scaled)
-    const squareSize = 160; // pixels; adjust to taste
+    const squareSize = this.px(50);
     ctx.beginPath();
     ctx.rect(this.cx - squareSize / 2, this.cy - squareSize / 2, squareSize, squareSize);
     ctx.stroke();
 
-    // Goal squares (approximate AFL goal squares near oval ends)
-    const leftX = this.cx - this.rx + 5;
-    const rightX = this.cx + this.rx - 65;
-    ctx.strokeRect(leftX, this.cy - 80, 60, 160);
-    ctx.strokeRect(rightX, this.cy - 80, 60, 160);
+    // Goal squares (AFL ~9m depth x 6.4m width)
+    const goalInset = 5; // px from boundary for drawing alignment
+    const goalDepth = this.px(9);
+    const goalWidth = this.px(6.4);
+    const leftGoalX = this.cx - this.rx + goalInset;
+    const rightGoalX = this.cx + this.rx - goalInset - goalDepth;
+    ctx.strokeRect(leftGoalX, this.cy - goalWidth / 2, goalDepth, goalWidth);
+    ctx.strokeRect(rightGoalX, this.cy - goalWidth / 2, goalDepth, goalWidth);
 
     // Goal posts at oval tips
-    this.drawGoalPosts(ctx, this.cx - this.rx + 5, this.cy);
-    this.drawGoalPosts(ctx, this.cx + this.rx - 5, this.cy);
+    this.drawGoalPosts(ctx, this.cx - this.rx + goalInset, this.cy);
+    this.drawGoalPosts(ctx, this.cx + this.rx - goalInset, this.cy);
 
-    // 50m arcs (circular approximation)
+    // 50m arcs (circular approximation within oval)
+    const r50 = this.px(50);
     ctx.beginPath();
-    ctx.arc(this.cx - this.rx + 5, this.cy, 120, -Math.PI / 2, Math.PI / 2);
+    ctx.arc(this.cx - this.rx + goalInset, this.cy, r50, -Math.PI / 2, Math.PI / 2);
     ctx.stroke();
     ctx.beginPath();
-    ctx.arc(this.cx + this.rx - 5, this.cy, 120, Math.PI / 2, (3 * Math.PI) / 2);
+    ctx.arc(this.cx + this.rx - goalInset, this.cy, r50, Math.PI / 2, (3 * Math.PI) / 2);
     ctx.stroke();
   }
 
@@ -99,5 +113,9 @@ export class Field {
     const ny = (y - this.cy) / (this.ry * this.ry);
     const len = Math.hypot(nx, ny) || 1;
     return { nx: nx / len, ny: ny / len };
+  }
+
+  private px(meters: number) {
+    return meters * this.pxPerM;
   }
 }
