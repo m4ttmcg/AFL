@@ -266,10 +266,12 @@ export class GameEngine {
       // Check for scoring at ends before OOB handling
       const ellipse = this.field.getEllipse();
       const areas = this.field.getGoalAreas();
-      const endEpsilon = 6; // px tolerance to consider at the end line
+      // Use normalized X on ellipse to detect tips irrespective of margin projection
+      const normX = (onEdge.x - ellipse.cx) / ellipse.rx;
+      const tipThreshold = 0.96; // near the ±rx extreme
       let scored = false;
 
-      if (Math.abs(onEdge.x - (ellipse.cx - ellipse.rx)) <= endEpsilon) {
+      if (normX <= -tipThreshold) {
         // Left end
         if (onEdge.y >= areas.left.yGoalTop && onEdge.y <= areas.left.yGoalBottom) {
           // Goal for away
@@ -284,7 +286,7 @@ export class GameEngine {
           this.ball.catch(inside.x, inside.y);
           scored = true;
         }
-      } else if (Math.abs(onEdge.x - (ellipse.cx + ellipse.rx)) <= endEpsilon) {
+      } else if (normX >= tipThreshold) {
         // Right end
         if (onEdge.y >= areas.right.yGoalTop && onEdge.y <= areas.right.yGoalBottom) {
           // Goal for home
