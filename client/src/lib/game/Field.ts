@@ -30,6 +30,18 @@ export class Field {
     ctx.fillStyle = '#228b22';
     ctx.fillRect(0, 0, this.width, this.height);
 
+    // Grass stripes clipped to oval
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(this.cx, this.cy, this.rx, this.ry, 0, 0, Math.PI * 2);
+    ctx.clip();
+    const stripeH = 40;
+    for (let y = this.cy - this.ry; y < this.cy + this.ry; y += stripeH) {
+      ctx.fillStyle = 'rgba(255,255,255,0.04)';
+      ctx.fillRect(this.cx - this.rx, y, this.rx * 2, stripeH / 2);
+    }
+    ctx.restore();
+
     // Oval boundary
     ctx.strokeStyle = '#fff';
     ctx.lineWidth = 3;
@@ -52,6 +64,22 @@ export class Field {
     ctx.beginPath();
     ctx.rect(this.cx - squareSize / 2, this.cy - squareSize / 2, squareSize, squareSize);
     ctx.stroke();
+    // Center square hash marks (short ticks at midpoints)
+    const hashLen = 12;
+    ctx.beginPath();
+    // Top midpoint tick (pointing outward)
+    ctx.moveTo(this.cx - hashLen / 2, this.cy - squareSize / 2);
+    ctx.lineTo(this.cx + hashLen / 2, this.cy - squareSize / 2);
+    // Bottom midpoint
+    ctx.moveTo(this.cx - hashLen / 2, this.cy + squareSize / 2);
+    ctx.lineTo(this.cx + hashLen / 2, this.cy + squareSize / 2);
+    // Left midpoint (vertical tick)
+    ctx.moveTo(this.cx - squareSize / 2, this.cy - hashLen / 2);
+    ctx.lineTo(this.cx - squareSize / 2, this.cy + hashLen / 2);
+    // Right midpoint
+    ctx.moveTo(this.cx + squareSize / 2, this.cy - hashLen / 2);
+    ctx.lineTo(this.cx + squareSize / 2, this.cy + hashLen / 2);
+    ctx.stroke();
 
     // Goal squares (AFL ~9m depth x 6.4m width)
     const goalInset = this.goalInsetPx; // px from boundary for drawing alignment
@@ -61,6 +89,27 @@ export class Field {
     const rightGoalX = this.cx + this.rx - goalInset - goalDepth;
     ctx.strokeRect(leftGoalX, this.cy - goalWidth / 2, goalDepth, goalWidth);
     ctx.strokeRect(rightGoalX, this.cy - goalWidth / 2, goalDepth, goalWidth);
+
+    // Scoring tints (light overlays): goal window (greenish), behind windows (yellowish)
+    const areas = this.getGoalAreas();
+    const tintDepth = this.px(6); // depth into field
+    ctx.save();
+    ctx.globalAlpha = 0.15;
+    // Left goal tint
+    ctx.fillStyle = '#00ff66';
+    ctx.fillRect(leftGoalX, areas.left.yGoalTop, tintDepth, areas.left.yGoalBottom - areas.left.yGoalTop);
+    // Left behind tints
+    ctx.fillStyle = '#ffd000';
+    ctx.fillRect(leftGoalX, areas.left.yBehindTop, tintDepth, areas.left.yGoalTop - areas.left.yBehindTop);
+    ctx.fillRect(leftGoalX, areas.left.yGoalBottom, tintDepth, areas.left.yBehindBottom - areas.left.yGoalBottom);
+    // Right goal tint
+    ctx.fillStyle = '#00ff66';
+    ctx.fillRect(this.cx + this.rx - goalInset - tintDepth, areas.right.yGoalTop, tintDepth, areas.right.yGoalBottom - areas.right.yGoalTop);
+    // Right behind tints
+    ctx.fillStyle = '#ffd000';
+    ctx.fillRect(this.cx + this.rx - goalInset - tintDepth, areas.right.yBehindTop, tintDepth, areas.right.yGoalTop - areas.right.yBehindTop);
+    ctx.fillRect(this.cx + this.rx - goalInset - tintDepth, areas.right.yGoalBottom, tintDepth, areas.right.yBehindBottom - areas.right.yGoalBottom);
+    ctx.restore();
 
     // Goal posts at oval tips
     this.drawGoalPosts(ctx, this.cx - this.rx + goalInset, this.cy);
@@ -119,6 +168,14 @@ export class Field {
       ctx.lineTo(x0 + (lean * thickness) / goalThickness, y1);
       ctx.closePath();
       ctx.fill();
+
+      // Shadow at base
+      ctx.save();
+      ctx.fillStyle = 'rgba(0,0,0,0.25)';
+      ctx.beginPath();
+      ctx.ellipse(px + lean * 0.4, y1 + 2, thickness * 1.2, 3, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
     };
 
     ctx.fillStyle = '#fff';
