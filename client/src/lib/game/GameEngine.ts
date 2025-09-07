@@ -258,24 +258,62 @@ export class GameEngine {
     const { x: bx, y: by } = this.ball;
     const isInsideNow = this.field.isInside(bx, by, this.ball.radius);
     if (this.wasBallInside && !isInsideNow) {
-      // Ball just went out
-      // Determine point on edge and small epsilon outside
       const onEdge = this.field.projectInside(bx, by, this.ball.radius);
       const { nx, ny } = this.field.normalAt(onEdge.x, onEdge.y);
-      // Place slightly outside and stop the ball
-      this.ball.x = onEdge.x + nx * 2;
-      this.ball.y = onEdge.y + ny * 2;
-      this.ball.vx = 0;
-      this.ball.vy = 0;
-      this.ball.vz = 0;
-      this.ball.z = 0;
 
-      // On the full if it hasn't bounced since last kick
-      if (this.ball.wasKicked && !this.ball.hasBouncedSinceKick) {
-        this.audioManager.playVoice('oob_full', 'outta bounds. On the full');
+      // Check for scoring at ends before OOB handling
+      const ellipse = this.field.getEllipse();
+      const areas = this.field.getGoalAreas();
+      const endEpsilon = 6; // px tolerance to consider at the end line
+      let scored = false;
+
+      if (Math.abs(onEdge.x - (ellipse.cx - ellipse.rx)) <= endEpsilon) {
+        // Left end
+        if (onEdge.y >= areas.left.yGoalTop && onEdge.y <= areas.left.yGoalBottom) {
+          // Goal for away
+          useFooty.getState().addScore('away', 1, 0);
+          this.audioManager.playSound('success');
+          this.ball.catch(this.ctx.canvas.width / 2, this.ctx.canvas.height / 2);
+          scored = true;
+        } else if (onEdge.y >= areas.left.yBehindTop && onEdge.y <= areas.left.yBehindBottom) {
+          // Behind for away
+          useFooty.getState().addScore('away', 0, 1);
+          const inside = this.field.projectInside(areas.left.x + 20, onEdge.y, this.ball.radius);
+          this.ball.catch(inside.x, inside.y);
+          scored = true;
+        }
+      } else if (Math.abs(onEdge.x - (ellipse.cx + ellipse.rx)) <= endEpsilon) {
+        // Right end
+        if (onEdge.y >= areas.right.yGoalTop && onEdge.y <= areas.right.yGoalBottom) {
+          // Goal for home
+          useFooty.getState().addScore('home', 1, 0);
+          this.audioManager.playSound('success');
+          this.ball.catch(this.ctx.canvas.width / 2, this.ctx.canvas.height / 2);
+          scored = true;
+        } else if (onEdge.y >= areas.right.yBehindTop && onEdge.y <= areas.right.yBehindBottom) {
+          // Behind for home
+          useFooty.getState().addScore('home', 0, 1);
+          const inside = this.field.projectInside(areas.right.x - 20, onEdge.y, this.ball.radius);
+          this.ball.catch(inside.x, inside.y);
+          scored = true;
+        }
       }
 
-      // Reset kick tracking after leaving play
+      if (!scored) {
+        // Treat as out on the full or standard OOB
+        this.ball.x = onEdge.x + nx * 2;
+        this.ball.y = onEdge.y + ny * 2;
+        this.ball.vx = 0;
+        this.ball.vy = 0;
+        this.ball.vz = 0;
+        this.ball.z = 0;
+
+        if (this.ball.wasKicked && !this.ball.hasBouncedSinceKick) {
+          this.audioManager.playVoice('oob_full', 'outta bounds. On the full');
+        }
+      }
+
+      // Reset kick tracking after leaving play (score or OOB)
       this.ball.wasKicked = false;
       this.ball.hasBouncedSinceKick = false;
     }
