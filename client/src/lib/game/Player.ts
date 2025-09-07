@@ -141,14 +141,28 @@ export class Player {
       if (ready && sprite) {
         const spriteSize = 40; // Larger player sprite size
         
-        // Draw the directional sprite
-        ctx.drawImage(
-          sprite as CanvasImageSource,
-          this.x - spriteSize / 2,
-          this.y - spriteSize / 2,
-          spriteSize,
-          spriteSize
-        );
+        // Draw the directional sprite, flipping for left to correct inversion
+        if (this.currentDirection === 'left') {
+          ctx.save();
+          ctx.translate(this.x, this.y);
+          ctx.scale(-1, 1);
+          ctx.drawImage(
+            sprite as CanvasImageSource,
+            -spriteSize / 2,
+            -spriteSize / 2,
+            spriteSize,
+            spriteSize
+          );
+          ctx.restore();
+        } else {
+          ctx.drawImage(
+            sprite as CanvasImageSource,
+            this.x - spriteSize / 2,
+            this.y - spriteSize / 2,
+            spriteSize,
+            spriteSize
+          );
+        }
         
         // Player number overlay
         ctx.fillStyle = this.textColor;
