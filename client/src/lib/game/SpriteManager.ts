@@ -10,9 +10,9 @@ export class SpriteManager {
 
   private loadSprites() {
     const spriteFiles = {
-      'player_red': '/textures/player_red_sheet.png',
-      'player_blue': '/textures/player_blue_sheet.png',
-      'player_black': '/textures/player_black_sheet.png',
+      'player_red': '/textures/player_red_single.png',
+      'player_blue': '/textures/player_blue_single.png',
+      'player_black': '/textures/player_black_single.png',
     };
 
     this.totalSprites = Object.keys(spriteFiles).length;

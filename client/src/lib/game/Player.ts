@@ -97,36 +97,33 @@ export class Player {
     if (this.spriteManager) {
       const sprite = this.spriteManager.getSpriteForTeamColor(this.color);
       if (sprite && sprite.complete) {
-        const spriteSize = 24; // Size to render the sprite
-        const frameSize = 32; // Each frame is 32x32 pixels in the sheet
+        const spriteSize = 28; // Size to render the sprite
         
-        // Calculate source position in sprite sheet
-        const sourceX = this.animationFrame * frameSize;
-        const sourceY = 0; // Single row of frames
-        
-        // Draw the current animation frame
+        // Draw the sprite (no animation frames for now, just single sprite)
         ctx.drawImage(
           sprite,
-          sourceX, sourceY, frameSize, frameSize, // Source rectangle
-          this.x - spriteSize / 2, this.y - spriteSize / 2, spriteSize, spriteSize // Destination rectangle
+          this.x - spriteSize / 2,
+          this.y - spriteSize / 2,
+          spriteSize,
+          spriteSize
         );
         
         // Player number overlay
         ctx.fillStyle = this.textColor;
-        ctx.font = 'bold 8px Inter, monospace';
+        ctx.font = 'bold 10px Inter, monospace';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.strokeStyle = '#000';
-        ctx.lineWidth = 2;
-        ctx.strokeText(this.number.toString(), this.x, this.y + 8);
-        ctx.fillText(this.number.toString(), this.x, this.y + 8);
+        ctx.lineWidth = 3;
+        ctx.strokeText(this.number.toString(), this.x, this.y + 2);
+        ctx.fillText(this.number.toString(), this.x, this.y + 2);
         
         // Controlled player indicator
         if (this.isControlled) {
           ctx.strokeStyle = '#ffff00';
           ctx.lineWidth = 3;
           ctx.beginPath();
-          ctx.arc(this.x, this.y, 18, 0, Math.PI * 2);
+          ctx.arc(this.x, this.y, 20, 0, Math.PI * 2);
           ctx.stroke();
         }
         return;
