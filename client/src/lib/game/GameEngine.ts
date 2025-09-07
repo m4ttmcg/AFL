@@ -5,6 +5,7 @@ import { Controls } from "./Controls";
 import { Physics } from "./Physics";
 import { AI } from "./AI";
 import { AudioManager } from "./AudioManager";
+import { SpriteManager } from "./SpriteManager";
 import { Team } from "../stores/useFooty";
 
 export class GameEngine {
@@ -16,6 +17,7 @@ export class GameEngine {
   private physics: Physics;
   private ai: AI;
   private audioManager: AudioManager;
+  private spriteManager: SpriteManager;
   private homeTeam: Team;
   private awayTeam: Team;
   private currentPlayer: Player | null = null;
@@ -33,6 +35,7 @@ export class GameEngine {
     this.physics = new Physics();
     this.ai = new AI();
     this.audioManager = new AudioManager();
+    this.spriteManager = new SpriteManager();
     
     this.initializePlayers();
     this.bindEvents();
@@ -47,7 +50,7 @@ export class GameEngine {
       const x = (fieldWidth * 0.25) + (Math.random() - 0.5) * 200;
       const y = (fieldHeight / 19) * (i + 1);
       const player = new Player(
-        x, y, 'home', this.homeTeam.primaryColor, this.homeTeam.textColor, i + 1
+        x, y, 'home', this.homeTeam.primaryColor, this.homeTeam.textColor, i + 1, this.spriteManager
       );
       this.players.push(player);
     }
@@ -57,7 +60,7 @@ export class GameEngine {
       const x = (fieldWidth * 0.75) + (Math.random() - 0.5) * 200;
       const y = (fieldHeight / 19) * (i + 1);
       const player = new Player(
-        x, y, 'away', this.awayTeam.primaryColor, this.awayTeam.textColor, i + 1
+        x, y, 'away', this.awayTeam.primaryColor, this.awayTeam.textColor, i + 1, this.spriteManager
       );
       this.players.push(player);
     }
@@ -171,7 +174,7 @@ export class GameEngine {
     if (!this.currentPlayer) return;
     
     const team = this.currentPlayer.team;
-    let nearest = null;
+    let nearest: Player | null = null;
     let minDistance = Infinity;
     
     this.players.forEach(player => {
