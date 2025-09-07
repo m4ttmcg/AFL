@@ -62,14 +62,24 @@ export class Field {
     this.drawGoalPosts(ctx, this.cx - this.rx + goalInset, this.cy);
     this.drawGoalPosts(ctx, this.cx + this.rx - goalInset, this.cy);
 
-    // 50m arcs (circular approximation within oval)
+    // 50m arcs (trim at oval boundary intersection)
     const r50 = this.px(50);
+    const leftCenterX = this.cx - this.rx + goalInset;
+    const rightCenterX = this.cx + this.rx - goalInset;
+    const [lStart, lEnd] = this.goalArcAngles(leftCenterX, r50);
+    const [rStart, rEnd] = this.goalArcAngles(rightCenterX, r50);
     ctx.beginPath();
-    ctx.arc(this.cx - this.rx + goalInset, this.cy, r50, -Math.PI / 2, Math.PI / 2);
+    ctx.arc(leftCenterX, this.cy, r50, lStart, lEnd);
     ctx.stroke();
     ctx.beginPath();
-    ctx.arc(this.cx + this.rx - goalInset, this.cy, r50, Math.PI / 2, (3 * Math.PI) / 2);
+    ctx.arc(rightCenterX, this.cy, r50, rStart, rEnd);
     ctx.stroke();
+
+    // Small tick marks at arc endpoints
+    this.drawArcTick(ctx, leftCenterX, this.cy, r50, lStart);
+    this.drawArcTick(ctx, leftCenterX, this.cy, r50, lEnd);
+    this.drawArcTick(ctx, rightCenterX, this.cy, r50, rStart);
+    this.drawArcTick(ctx, rightCenterX, this.cy, r50, rEnd);
   }
 
   private drawGoalPosts(ctx: CanvasRenderingContext2D, x: number, centerY: number) {
@@ -117,5 +127,55 @@ export class Field {
 
   private px(meters: number) {
     return meters * this.pxPerM;
+  }
+
+  // Compute arc start/end angles (in radians) for a goal arc centered at gx, radius r,
+  // trimmed to where the circle intersects the oval boundary. Symmetric around axis.
+  private goalArcAngles(gx: number, r: number): [number, number] {
+    const dx = gx - this.cx; // horizontal offset from ellipse center
+    const invRx2 = 1 / (this.rx * this.rx);
+    const invRy2 = 1 / (this.ry * this.ry);
+    const a = r * r * (invRx2 - invRy2);
+    const b = 2 * dx * r * invRx2;
+    const c = r * r * invRy2 + (dx * dx) * invRx2 - 1;
+    let theta = Math.PI / 2; // default half-arc if degeneracy
+    const eps = 1e-6;
+    if (Math.abs(a) < eps) {
+      // Near-circular ellipse or extremely small difference; fallback to half-arc
+      theta = Math.PI / 2;
+    } else {
+      const disc = b * b - 4 * a * c;
+      if (disc >= 0) {
+        const sqrtDisc = Math.sqrt(disc);
+        const u1 = (-b + sqrtDisc) / (2 * a); // candidate cos(t)
+        const u2 = (-b - sqrtDisc) / (2 * a);
+        const clamp = (u: number) => Math.max(-1, Math.min(1, u));
+        const cu1 = clamp(u1);
+        const cu2 = clamp(u2);
+        // Choose the valid cosine producing the smaller angle (larger cosine)
+        const cu = Math.max(cu1, cu2);
+        theta = Math.acos(cu);
+        if (!isFinite(theta) || theta <= 0) theta = Math.PI / 2;
+      }
+    }
+    // Left side centers are negative dx, arc around angle 0; Right side around pi
+    if (dx < 0) {
+      return [-theta, theta];
+    } else {
+      return [Math.PI - theta, Math.PI + theta];
+    }
+  }
+
+  private drawArcTick(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, angle: number) {
+    const len = 10; // px tick length
+    const px = cx + r * Math.cos(angle);
+    const py = cy + r * Math.sin(angle);
+    // Tangent vector on circle at angle
+    const tx = -Math.sin(angle);
+    const ty = Math.cos(angle);
+    ctx.beginPath();
+    ctx.moveTo(px - (tx * len) / 2, py - (ty * len) / 2);
+    ctx.lineTo(px + (tx * len) / 2, py + (ty * len) / 2);
+    ctx.stroke();
   }
 }
