@@ -26,6 +26,7 @@ export class GameEngine {
   private wasBallInside: boolean = true;
   private audioUnlocked: boolean = false;
   private prevBallX: number = 0;
+  private prevBallY: number = 0;
 
   constructor(ctx: CanvasRenderingContext2D, homeTeam: Team, awayTeam: Team) {
     this.ctx = ctx;
@@ -230,6 +231,7 @@ export class GameEngine {
     
     // Update ball physics
     this.prevBallX = this.ball.x;
+    this.prevBallY = this.ball.y;
     this.ball.update(deltaTime);
     
     // Update players
@@ -248,7 +250,7 @@ export class GameEngine {
     });
     
     // Scoring detection (must run before OOB to avoid false OOB)
-    if (this.checkScoring()) {
+    if (this.checkScoringSegment()) {
       // Reset OOB state so next frame proceeds normally
       this.wasBallInside = true;
       return;
@@ -321,6 +323,7 @@ export class GameEngine {
   }
 
   private checkScoring(): boolean {
+    // Legacy check; kept as fallback but replaced by segment-based scoring.
     const areas = this.field.getGoalAreas();
     const bx = this.ball.x;
     const by = this.ball.y;
@@ -359,6 +362,62 @@ export class GameEngine {
         store.addScore('home', 0, 1);
         const inside = this.field.projectInside(areas.right.x - 20, this.ctx.canvas.height / 2, this.ball.radius);
         this.ball.catch(inside.x, by);
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  private checkScoringSegment(): boolean {
+    const areas = this.field.getGoalAreas();
+    const ax = this.prevBallX;
+    const ay = this.prevBallY;
+    const bx = this.ball.x;
+    const by = this.ball.y;
+    const store = useFooty.getState();
+
+    const crossesVertical = (xLine: number) => {
+      if (ax === bx) return null;
+      if ((ax - xLine) * (bx - xLine) > 0) return null; // both on same side
+      const t = (xLine - ax) / (bx - ax);
+      if (t < 0 || t > 1) return null;
+      const y = ay + t * (by - ay);
+      return { t, y };
+    };
+
+    // Left line (away scores)
+    const leftCross = crossesVertical(areas.left.x);
+    if (leftCross) {
+      const y = leftCross.y;
+      if (y >= areas.left.yGoalTop && y <= areas.left.yGoalBottom) {
+        store.addScore('away', 1, 0);
+        this.audioManager.playSound('success');
+        this.ball.catch(this.ctx.canvas.width / 2, this.ctx.canvas.height / 2);
+        return true;
+      }
+      if (y >= areas.left.yBehindTop && y <= areas.left.yBehindBottom) {
+        store.addScore('away', 0, 1);
+        const inside = this.field.projectInside(areas.left.x + 20, y, this.ball.radius);
+        this.ball.catch(inside.x, inside.y);
+        return true;
+      }
+    }
+
+    // Right line (home scores)
+    const rightCross = crossesVertical(areas.right.x);
+    if (rightCross) {
+      const y = rightCross.y;
+      if (y >= areas.right.yGoalTop && y <= areas.right.yGoalBottom) {
+        store.addScore('home', 1, 0);
+        this.audioManager.playSound('success');
+        this.ball.catch(this.ctx.canvas.width / 2, this.ctx.canvas.height / 2);
+        return true;
+      }
+      if (y >= areas.right.yBehindTop && y <= areas.right.yBehindBottom) {
+        store.addScore('home', 0, 1);
+        const inside = this.field.projectInside(areas.right.x - 20, y, this.ball.radius);
+        this.ball.catch(inside.x, inside.y);
         return true;
       }
     }
