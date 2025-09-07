@@ -6,7 +6,7 @@ import { Physics } from "./Physics";
 import { AI } from "./AI";
 import { AudioManager } from "./AudioManager";
 import { SpriteManager } from "./SpriteManager";
-import { Team } from "../stores/useFooty";
+import { Team, useFooty } from "../stores/useFooty";
 
 export class GameEngine {
   private ctx: CanvasRenderingContext2D;
@@ -24,6 +24,8 @@ export class GameEngine {
   private gameTime: number = 0;
   private lastTime: number = 0;
   private wasBallInside: boolean = true;
+  private audioUnlocked: boolean = false;
+  private prevBallX: number = 0;
 
   constructor(ctx: CanvasRenderingContext2D, homeTeam: Team, awayTeam: Team) {
     this.ctx = ctx;
@@ -73,6 +75,11 @@ export class GameEngine {
   private bindEvents() {
     this.controls.onKeyDown = (key: string) => {
       console.log('Key pressed:', key);
+      if (!this.audioUnlocked) {
+        // Unlock audio on first user interaction
+        this.audioUnlocked = true;
+        this.audioManager.playBackgroundMusic();
+      }
       this.handleInput(key, true);
     };
     
@@ -210,6 +217,7 @@ export class GameEngine {
     this.gameTime += deltaTime;
     
     // Update ball physics
+    this.prevBallX = this.ball.x;
     this.ball.update(deltaTime);
     
     // Update players
@@ -227,6 +235,13 @@ export class GameEngine {
       player.y = clamped.y;
     });
     
+    // Scoring detection (must run before OOB to avoid false OOB)
+    if (this.checkScoring()) {
+      // Reset OOB state so next frame proceeds normally
+      this.wasBallInside = true;
+      return;
+    }
+
     // Ball out-of-bounds detection on oval boundary
     const { x: bx, y: by } = this.ball;
     const isInsideNow = this.field.isInside(bx, by, this.ball.radius);
@@ -245,7 +260,7 @@ export class GameEngine {
 
       // On the full if it hasn't bounced since last kick
       if (this.ball.wasKicked && !this.ball.hasBouncedSinceKick) {
-        this.audioManager.speak('outta bounds. On the full');
+        this.audioManager.playVoice('oob_full', 'outta bounds. On the full');
       }
 
       // Reset kick tracking after leaving play
@@ -253,6 +268,54 @@ export class GameEngine {
       this.ball.hasBouncedSinceKick = false;
     }
     this.wasBallInside = isInsideNow;
+  }
+
+  private checkScoring(): boolean {
+    const areas = this.field.getGoalAreas();
+    const bx = this.ball.x;
+    const by = this.ball.y;
+    const goingLeft = this.ball.vx < 0;
+    const goingRight = this.ball.vx > 0;
+    const store = useFooty.getState();
+
+    // Left side scoring (away team)
+    if (goingLeft && this.prevBallX > areas.left.x && bx <= areas.left.x) {
+      if (by >= areas.left.yGoalTop && by <= areas.left.yGoalBottom) {
+        // Goal for away
+        store.addScore('away', 1, 0);
+        this.audioManager.playSound('success');
+        // Restart at centre
+        this.ball.catch(this.ctx.canvas.width / 2, this.ctx.canvas.height / 2);
+        return true;
+      } else if (by >= areas.left.yBehindTop && by <= areas.left.yBehindBottom) {
+        // Behind for away
+        store.addScore('away', 0, 1);
+        // Place ball just inside field near goal line for kick-in
+        const inside = this.field.projectInside(areas.left.x + 20, this.ctx.canvas.height / 2, this.ball.radius);
+        this.ball.catch(inside.x, by);
+        return true;
+      }
+    }
+
+    // Right side scoring (home team)
+    if (goingRight && this.prevBallX < areas.right.x && bx >= areas.right.x) {
+      if (by >= areas.right.yGoalTop && by <= areas.right.yGoalBottom) {
+        // Goal for home
+        store.addScore('home', 1, 0);
+        this.audioManager.playSound('success');
+        // Restart at centre
+        this.ball.catch(this.ctx.canvas.width / 2, this.ctx.canvas.height / 2);
+        return true;
+      } else if (by >= areas.right.yBehindTop && by <= areas.right.yBehindBottom) {
+        // Behind for home
+        store.addScore('home', 0, 1);
+        const inside = this.field.projectInside(areas.right.x - 20, this.ctx.canvas.height / 2, this.ball.radius);
+        this.ball.catch(inside.x, by);
+        return true;
+      }
+    }
+
+    return false;
   }
 
   public render() {

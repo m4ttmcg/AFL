@@ -6,6 +6,8 @@ export class Field {
   private rx: number;
   private ry: number;
   private pxPerM: number;
+  private goalInsetPx: number;
+  private postSpreadFactor: number;
 
   constructor(width: number, height: number) {
     this.width = width;
@@ -15,6 +17,8 @@ export class Field {
     // Leave a small margin from canvas border
     this.rx = width / 2 - 10;
     this.ry = height / 2 - 10;
+    this.goalInsetPx = 5;
+    this.postSpreadFactor = 1.35; // visually spread posts slightly wider
     // Approximate AFL ground: 160m x 130m playing area (mid-range)
     const mLength = 160;
     const mWidth = 130;
@@ -50,9 +54,9 @@ export class Field {
     ctx.stroke();
 
     // Goal squares (AFL ~9m depth x 6.4m width)
-    const goalInset = 5; // px from boundary for drawing alignment
+    const goalInset = this.goalInsetPx; // px from boundary for drawing alignment
     const goalDepth = this.px(9);
-    const goalWidth = this.px(6.4);
+    const goalWidth = this.px(6.4 * this.postSpreadFactor);
     const leftGoalX = this.cx - this.rx + goalInset;
     const rightGoalX = this.cx + this.rx - goalInset - goalDepth;
     ctx.strokeRect(leftGoalX, this.cy - goalWidth / 2, goalDepth, goalWidth);
@@ -84,8 +88,8 @@ export class Field {
 
   private drawGoalPosts(ctx: CanvasRenderingContext2D, x: number, centerY: number) {
     // Distances in meters
-    const halfGoal = 3.2; // half of 6.4m
-    const behindOffset = 6.4; // distance from goal post to behind post
+    const halfGoal = 3.2 * this.postSpreadFactor; // half of 6.4m (visually exaggerated)
+    const behindOffset = 6.4 * this.postSpreadFactor; // distance from goal post to behind post
 
     // Convert to pixels
     const yGoalTop = centerY - this.px(halfGoal);
@@ -124,6 +128,34 @@ export class Field {
     // Behind posts (shorter)
     drawPost(x, yBehindTop, behindHeight, behindThickness);
     drawPost(x, yBehindBottom, behindHeight, behindThickness);
+  }
+
+  public getGoalAreas() {
+    const goalInset = this.goalInsetPx;
+    const leftX = this.cx - this.rx + goalInset;
+    const rightX = this.cx + this.rx - goalInset;
+    const halfGoal = 3.2 * this.postSpreadFactor;
+    const behindOffset = 6.4 * this.postSpreadFactor;
+    const yGoalTop = this.cy - this.px(halfGoal);
+    const yGoalBottom = this.cy + this.px(halfGoal);
+    const yBehindTop = this.cy - this.px(halfGoal + behindOffset);
+    const yBehindBottom = this.cy + this.px(halfGoal + behindOffset);
+    return {
+      left: {
+        x: leftX,
+        yGoalTop,
+        yGoalBottom,
+        yBehindTop,
+        yBehindBottom,
+      },
+      right: {
+        x: rightX,
+        yGoalTop,
+        yGoalBottom,
+        yBehindTop,
+        yBehindBottom,
+      },
+    };
   }
 
   // Geometry helpers
