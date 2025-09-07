@@ -115,12 +115,14 @@ export class Player {
     // Try to use directional sprite if available
     if (this.spriteManager) {
       const sprite = this.spriteManager.getSpriteForTeamColorAndDirection(this.color, this.currentDirection);
-      if (sprite && sprite.complete) {
+      // If sprite is an HTMLImageElement, ensure it's loaded; canvases are always ready
+      const ready = !!sprite && (!(sprite instanceof Image) || (sprite as HTMLImageElement).complete);
+      if (ready && sprite) {
         const spriteSize = 28; // Size to render the sprite
         
         // Draw the directional sprite
         ctx.drawImage(
-          sprite,
+          sprite as CanvasImageSource,
           this.x - spriteSize / 2,
           this.y - spriteSize / 2,
           spriteSize,
