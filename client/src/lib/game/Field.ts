@@ -83,14 +83,39 @@ export class Field {
   }
 
   private drawGoalPosts(ctx: CanvasRenderingContext2D, x: number, centerY: number) {
+    // Distances in meters
+    const halfGoal = 3.2; // half of 6.4m
+    const behindOffset = 6.4; // distance from goal post to behind post
+
+    // Convert to pixels
+    const yGoalTop = centerY - this.px(halfGoal);
+    const yGoalBottom = centerY + this.px(halfGoal);
+    const yBehindTop = centerY - this.px(halfGoal + behindOffset);
+    const yBehindBottom = centerY + this.px(halfGoal + behindOffset);
+
+    // Post visual sizes (screen-space aesthetics)
+    const goalThickness = 4;
+    const behindThickness = 3;
+    const goalHeight = 28;
+    const behindHeight = 18;
+
     ctx.fillStyle = '#fff';
-    ctx.lineWidth = 2;
-    // Goal posts
-    ctx.fillRect(x - 2, centerY - 30, 4, 8);
-    ctx.fillRect(x - 2, centerY + 22, 4, 8);
-    // Behind posts
-    ctx.fillRect(x - 2, centerY - 55, 4, 8);
-    ctx.fillRect(x - 2, centerY + 47, 4, 8);
+    // Goal posts (taller)
+    ctx.fillRect(x - goalThickness / 2, yGoalTop - goalHeight / 2, goalThickness, goalHeight);
+    ctx.fillRect(x - goalThickness / 2, yGoalBottom - goalHeight / 2, goalThickness, goalHeight);
+    // Behind posts (shorter)
+    ctx.fillRect(x - behindThickness / 2, yBehindTop - behindHeight / 2, behindThickness, behindHeight);
+    ctx.fillRect(x - behindThickness / 2, yBehindBottom - behindHeight / 2, behindThickness, behindHeight);
+
+    // Goal line segment between behind posts (slightly thicker)
+    ctx.save();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(x, yBehindTop);
+    ctx.lineTo(x, yBehindBottom);
+    ctx.stroke();
+    ctx.restore();
   }
 
   // Geometry helpers
@@ -129,41 +154,31 @@ export class Field {
     return meters * this.pxPerM;
   }
 
-  // Compute arc start/end angles (in radians) for a goal arc centered at gx, radius r,
-  // trimmed to where the circle intersects the oval boundary. Symmetric around axis.
+  // Robust numeric trimming: find arc endpoints where the 50m circle meets the oval boundary.
   private goalArcAngles(gx: number, r: number): [number, number] {
-    const dx = gx - this.cx; // horizontal offset from ellipse center
-    const invRx2 = 1 / (this.rx * this.rx);
-    const invRy2 = 1 / (this.ry * this.ry);
-    const a = r * r * (invRx2 - invRy2);
-    const b = 2 * dx * r * invRx2;
-    const c = r * r * invRy2 + (dx * dx) * invRx2 - 1;
-    let theta = Math.PI / 2; // default half-arc if degeneracy
-    const eps = 1e-6;
-    if (Math.abs(a) < eps) {
-      // Near-circular ellipse or extremely small difference; fallback to half-arc
-      theta = Math.PI / 2;
-    } else {
-      const disc = b * b - 4 * a * c;
-      if (disc >= 0) {
-        const sqrtDisc = Math.sqrt(disc);
-        const u1 = (-b + sqrtDisc) / (2 * a); // candidate cos(t)
-        const u2 = (-b - sqrtDisc) / (2 * a);
-        const clamp = (u: number) => Math.max(-1, Math.min(1, u));
-        const cu1 = clamp(u1);
-        const cu2 = clamp(u2);
-        // Choose the valid cosine producing the smaller angle (larger cosine)
-        const cu = Math.max(cu1, cu2);
-        theta = Math.acos(cu);
-        if (!isFinite(theta) || theta <= 0) theta = Math.PI / 2;
+    const insideAt = (angle: number) => {
+      const x = gx + r * Math.cos(angle);
+      const y = this.cy + r * Math.sin(angle);
+      return this.isInside(x, y, 0);
+    };
+
+    const base = gx < this.cx ? 0 : Math.PI; // left arcs around 0, right around pi
+    const findBound = (sign: 1 | -1) => {
+      let lo = 0;
+      let hi = Math.PI / 2;
+      // If even the far end is inside, return hi
+      if (insideAt(base + sign * hi)) return hi;
+      // Binary search for transition from inside to outside
+      for (let i = 0; i < 20; i++) {
+        const mid = (lo + hi) / 2;
+        if (insideAt(base + sign * mid)) lo = mid; else hi = mid;
       }
-    }
-    // Left side centers are negative dx, arc around angle 0; Right side around pi
-    if (dx < 0) {
-      return [-theta, theta];
-    } else {
-      return [Math.PI - theta, Math.PI + theta];
-    }
+      return lo;
+    };
+
+    const upper = findBound(-1);
+    const lower = findBound(1);
+    return [base - upper, base + lower];
   }
 
   private drawArcTick(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, angle: number) {
