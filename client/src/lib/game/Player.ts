@@ -12,6 +12,10 @@ export class Player {
   public isControlled: boolean = false;
   public speed: number = 120;
   private spriteManager?: SpriteManager;
+  private animationFrame: number = 0;
+  private animationTimer: number = 0;
+  private readonly animationSpeed: number = 0.15; // Seconds per frame
+  private readonly framesPerRow: number = 4; // 4 animation frames
   
   private movement = {
     up: false,
@@ -52,6 +56,13 @@ export class Player {
     
     this.x += this.vx * deltaTime;
     this.y += this.vy * deltaTime;
+    
+    // Update animation if moving
+    if (magnitude > 0) {
+      this.updateAnimation(deltaTime);
+    } else {
+      this.animationFrame = 0; // Standing still
+    }
   }
 
   public updateAI(targetX: number, targetY: number, deltaTime: number) {
@@ -65,6 +76,19 @@ export class Player {
       
       this.x += this.vx * deltaTime;
       this.y += this.vy * deltaTime;
+      
+      // Update animation for AI movement
+      this.updateAnimation(deltaTime);
+    } else {
+      this.animationFrame = 0; // Standing still
+    }
+  }
+
+  private updateAnimation(deltaTime: number) {
+    this.animationTimer += deltaTime;
+    if (this.animationTimer >= this.animationSpeed) {
+      this.animationTimer = 0;
+      this.animationFrame = (this.animationFrame + 1) % this.framesPerRow;
     }
   }
 
@@ -74,12 +98,17 @@ export class Player {
       const sprite = this.spriteManager.getSpriteForTeamColor(this.color);
       if (sprite && sprite.complete) {
         const spriteSize = 24; // Size to render the sprite
+        const frameSize = 32; // Each frame is 32x32 pixels in the sheet
+        
+        // Calculate source position in sprite sheet
+        const sourceX = this.animationFrame * frameSize;
+        const sourceY = 0; // Single row of frames
+        
+        // Draw the current animation frame
         ctx.drawImage(
           sprite,
-          this.x - spriteSize / 2,
-          this.y - spriteSize / 2,
-          spriteSize,
-          spriteSize
+          sourceX, sourceY, frameSize, frameSize, // Source rectangle
+          this.x - spriteSize / 2, this.y - spriteSize / 2, spriteSize, spriteSize // Destination rectangle
         );
         
         // Player number overlay
