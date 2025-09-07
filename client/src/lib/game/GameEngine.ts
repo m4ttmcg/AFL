@@ -286,12 +286,10 @@ export class GameEngine {
     const areas = this.field.getGoalAreas();
     const bx = this.ball.x;
     const by = this.ball.y;
-    const goingLeft = this.ball.vx < 0;
-    const goingRight = this.ball.vx > 0;
     const store = useFooty.getState();
 
     // Left side scoring (away team)
-    if (goingLeft && this.prevBallX > areas.left.x && bx <= areas.left.x) {
+    if (this.prevBallX >= areas.left.x && bx < areas.left.x) {
       if (by >= areas.left.yGoalTop && by <= areas.left.yGoalBottom) {
         // Goal for away
         store.addScore('away', 1, 0);
@@ -310,7 +308,7 @@ export class GameEngine {
     }
 
     // Right side scoring (home team)
-    if (goingRight && this.prevBallX < areas.right.x && bx >= areas.right.x) {
+    if (this.prevBallX <= areas.right.x && bx > areas.right.x) {
       if (by >= areas.right.yGoalTop && by <= areas.right.yGoalBottom) {
         // Goal for home
         store.addScore('home', 1, 0);

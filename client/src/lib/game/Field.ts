@@ -18,7 +18,7 @@ export class Field {
     this.rx = width / 2 - 10;
     this.ry = height / 2 - 10;
     this.goalInsetPx = 5;
-    this.postSpreadFactor = 1.35; // visually spread posts slightly wider
+    this.postSpreadFactor = 1.5; // visually spread posts slightly wider
     // Approximate AFL ground: 160m x 130m playing area (mid-range)
     const mLength = 160;
     const mWidth = 130;
