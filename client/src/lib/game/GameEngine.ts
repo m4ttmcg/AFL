@@ -23,6 +23,7 @@ export class GameEngine {
   private currentPlayer: Player | null = null;
   private gameTime: number = 0;
   private lastTime: number = 0;
+  private wasBallInside: boolean = true;
 
   constructor(ctx: CanvasRenderingContext2D, homeTeam: Team, awayTeam: Team) {
     this.ctx = ctx;
@@ -220,20 +221,38 @@ export class GameEngine {
         this.ai.updatePlayer(player, this.ball, this.players, deltaTime);
       }
       
-      // Keep players on field
-      player.x = Math.max(20, Math.min(this.ctx.canvas.width - 20, player.x));
-      player.y = Math.max(20, Math.min(this.ctx.canvas.height - 20, player.y));
+      // Keep players on oval field
+      const clamped = this.field.projectInside(player.x, player.y, 20);
+      player.x = clamped.x;
+      player.y = clamped.y;
     });
     
-    // Ball collision with field boundaries
-    if (this.ball.x < 0 || this.ball.x > this.ctx.canvas.width) {
-      this.ball.vx *= -0.5;
-      this.ball.x = Math.max(0, Math.min(this.ctx.canvas.width, this.ball.x));
+    // Ball out-of-bounds detection on oval boundary
+    const { x: bx, y: by } = this.ball;
+    const isInsideNow = this.field.isInside(bx, by, this.ball.radius);
+    if (this.wasBallInside && !isInsideNow) {
+      // Ball just went out
+      // Determine point on edge and small epsilon outside
+      const onEdge = this.field.projectInside(bx, by, this.ball.radius);
+      const { nx, ny } = this.field.normalAt(onEdge.x, onEdge.y);
+      // Place slightly outside and stop the ball
+      this.ball.x = onEdge.x + nx * 2;
+      this.ball.y = onEdge.y + ny * 2;
+      this.ball.vx = 0;
+      this.ball.vy = 0;
+      this.ball.vz = 0;
+      this.ball.z = 0;
+
+      // On the full if it hasn't bounced since last kick
+      if (this.ball.wasKicked && !this.ball.hasBouncedSinceKick) {
+        this.audioManager.speak('outta bounds. On the full');
+      }
+
+      // Reset kick tracking after leaving play
+      this.ball.wasKicked = false;
+      this.ball.hasBouncedSinceKick = false;
     }
-    if (this.ball.y < 0 || this.ball.y > this.ctx.canvas.height) {
-      this.ball.vy *= -0.5;
-      this.ball.y = Math.max(0, Math.min(this.ctx.canvas.height, this.ball.y));
-    }
+    this.wasBallInside = isInsideNow;
   }
 
   public render() {
