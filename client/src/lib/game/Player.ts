@@ -118,7 +118,7 @@ export class Player {
       // If sprite is an HTMLImageElement, ensure it's loaded; canvases are always ready
       const ready = !!sprite && (!(sprite instanceof Image) || (sprite as HTMLImageElement).complete);
       if (ready && sprite) {
-        const spriteSize = 28; // Size to render the sprite
+        const spriteSize = 40; // Larger player sprite size
         
         // Draw the directional sprite
         ctx.drawImage(
@@ -141,11 +141,11 @@ export class Player {
         
         // Controlled player indicator
         if (this.isControlled) {
-          ctx.strokeStyle = '#ffff00';
-          ctx.lineWidth = 3;
-          ctx.beginPath();
-          ctx.arc(this.x, this.y, 20, 0, Math.PI * 2);
-          ctx.stroke();
+        ctx.strokeStyle = '#ffff00';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, 26, 0, Math.PI * 2);
+        ctx.stroke();
         }
         return;
       }
@@ -154,7 +154,7 @@ export class Player {
     // Fallback to circle rendering if sprite not available
     ctx.fillStyle = this.color;
     ctx.beginPath();
-    ctx.arc(this.x, this.y, 12, 0, Math.PI * 2);
+    ctx.arc(this.x, this.y, 16, 0, Math.PI * 2);
     ctx.fill();
     
     // Player border
@@ -174,7 +174,7 @@ export class Player {
       ctx.strokeStyle = '#ffff00';
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.arc(this.x, this.y, 18, 0, Math.PI * 2);
+      ctx.arc(this.x, this.y, 22, 0, Math.PI * 2);
       ctx.stroke();
     }
   }

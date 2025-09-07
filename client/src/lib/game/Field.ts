@@ -93,29 +93,37 @@ export class Field {
     const yBehindTop = centerY - this.px(halfGoal + behindOffset);
     const yBehindBottom = centerY + this.px(halfGoal + behindOffset);
 
-    // Post visual sizes (screen-space aesthetics)
-    const goalThickness = 4;
+    // Visual sizes (screen-space aesthetics)
+    const goalThickness = 5;
     const behindThickness = 3;
-    const goalHeight = 28;
-    const behindHeight = 18;
+    const goalHeight = 34;
+    const behindHeight = 22;
+
+    // Slight perspective: lean posts toward oval center
+    const lean = x < this.cx ? 4 : -4; // px offset at the top
+
+    const drawPost = (px: number, cy: number, height: number, thickness: number) => {
+      const halfH = height / 2;
+      const x0 = px - thickness / 2;
+      const x1 = px + thickness / 2;
+      const y0 = cy - halfH;
+      const y1 = cy + halfH;
+      ctx.beginPath();
+      ctx.moveTo(x0, y0);
+      ctx.lineTo(x1, y0);
+      ctx.lineTo(x1 + (lean * thickness) / goalThickness, y1);
+      ctx.lineTo(x0 + (lean * thickness) / goalThickness, y1);
+      ctx.closePath();
+      ctx.fill();
+    };
 
     ctx.fillStyle = '#fff';
     // Goal posts (taller)
-    ctx.fillRect(x - goalThickness / 2, yGoalTop - goalHeight / 2, goalThickness, goalHeight);
-    ctx.fillRect(x - goalThickness / 2, yGoalBottom - goalHeight / 2, goalThickness, goalHeight);
+    drawPost(x, yGoalTop, goalHeight, goalThickness);
+    drawPost(x, yGoalBottom, goalHeight, goalThickness);
     // Behind posts (shorter)
-    ctx.fillRect(x - behindThickness / 2, yBehindTop - behindHeight / 2, behindThickness, behindHeight);
-    ctx.fillRect(x - behindThickness / 2, yBehindBottom - behindHeight / 2, behindThickness, behindHeight);
-
-    // Goal line segment between behind posts (slightly thicker)
-    ctx.save();
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.moveTo(x, yBehindTop);
-    ctx.lineTo(x, yBehindBottom);
-    ctx.stroke();
-    ctx.restore();
+    drawPost(x, yBehindTop, behindHeight, behindThickness);
+    drawPost(x, yBehindBottom, behindHeight, behindThickness);
   }
 
   // Geometry helpers
