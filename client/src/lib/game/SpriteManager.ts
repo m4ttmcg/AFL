@@ -10,9 +10,18 @@ export class SpriteManager {
 
   private loadSprites() {
     const spriteFiles = {
-      'player_red': '/textures/player_red_single.png',
-      'player_blue': '/textures/player_blue_single.png',
-      'player_black': '/textures/player_black_single.png',
+      'player_red_up': '/textures/player_red_up.png',
+      'player_red_down': '/textures/player_red_down.png',
+      'player_red_left': '/textures/player_red_left.png',
+      'player_red_right': '/textures/player_red_right.png',
+      'player_blue_up': '/textures/player_blue_up.png',
+      'player_blue_down': '/textures/player_blue_down.png',
+      'player_blue_left': '/textures/player_blue_left.png',
+      'player_blue_right': '/textures/player_blue_right.png',
+      'player_black_up': '/textures/player_black_up.png',
+      'player_black_down': '/textures/player_black_down.png',
+      'player_black_left': '/textures/player_black_left.png',
+      'player_black_right': '/textures/player_black_right.png',
     };
 
     this.totalSprites = Object.keys(spriteFiles).length;
@@ -41,48 +50,47 @@ export class SpriteManager {
     return this.sprites.get(name) || null;
   }
 
-  public getSpriteForTeamColor(color: string): HTMLImageElement | null {
+  public getSpriteForTeamColorAndDirection(color: string, direction: 'up' | 'down' | 'left' | 'right'): HTMLImageElement | null {
     // Map team colors to sprite variants
     const colorLower = color.toLowerCase();
+    let colorType = 'red'; // default
     
     // Check for red colors
     if (colorLower.includes('#ff0000') || colorLower.includes('red') || colorLower === '#ff0000') {
-      return this.getSprite('player_red');
+      colorType = 'red';
     }
-    
     // Check for blue colors
-    if (colorLower.includes('#0000ff') || colorLower.includes('blue') || colorLower === '#0000ff') {
-      return this.getSprite('player_blue');
+    else if (colorLower.includes('#0000ff') || colorLower.includes('blue') || colorLower === '#0000ff') {
+      colorType = 'blue';
     }
-    
     // Check for black colors
-    if (colorLower.includes('#000000') || colorLower.includes('black') || colorLower === '#000000') {
-      return this.getSprite('player_black');
+    else if (colorLower.includes('#000000') || colorLower.includes('black') || colorLower === '#000000') {
+      colorType = 'black';
     }
-    
     // Check for other specific team colors
-    if (colorLower.includes('#800080') || colorLower.includes('purple')) {
-      return this.getSprite('player_red'); // Purple teams use red sprite
+    else if (colorLower.includes('#800080') || colorLower.includes('purple')) {
+      colorType = 'red'; // Purple teams use red sprite
+    }
+    else if (colorLower.includes('#8b4513') || colorLower.includes('brown')) {
+      colorType = 'black'; // Brown teams use black sprite
+    }
+    else if (colorLower.includes('#ffd700') || colorLower.includes('gold') || colorLower.includes('yellow')) {
+      colorType = 'red'; // Gold/yellow teams use red sprite
+    }
+    else if (colorLower.includes('#ffa500') || colorLower.includes('orange')) {
+      colorType = 'red'; // Orange teams use red sprite
+    }
+    else if (colorLower.includes('#008000') || colorLower.includes('green')) {
+      colorType = 'blue'; // Green teams use blue sprite
     }
     
-    if (colorLower.includes('#8b4513') || colorLower.includes('brown')) {
-      return this.getSprite('player_black'); // Brown teams use black sprite
-    }
-    
-    if (colorLower.includes('#ffd700') || colorLower.includes('gold') || colorLower.includes('yellow')) {
-      return this.getSprite('player_red'); // Gold/yellow teams use red sprite
-    }
-    
-    if (colorLower.includes('#ffa500') || colorLower.includes('orange')) {
-      return this.getSprite('player_red'); // Orange teams use red sprite
-    }
-    
-    if (colorLower.includes('#008000') || colorLower.includes('green')) {
-      return this.getSprite('player_blue'); // Green teams use blue sprite
-    }
-    
-    // Default to red for unknown colors
-    return this.getSprite('player_red');
+    const spriteName = `player_${colorType}_${direction}`;
+    return this.getSprite(spriteName);
+  }
+
+  // Keep the old method for backwards compatibility, defaulting to 'down' direction
+  public getSpriteForTeamColor(color: string): HTMLImageElement | null {
+    return this.getSpriteForTeamColorAndDirection(color, 'down');
   }
 
   public isAllLoaded(): boolean {

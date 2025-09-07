@@ -16,6 +16,7 @@ export class Player {
   private animationTimer: number = 0;
   private readonly animationSpeed: number = 0.15; // Seconds per frame
   private readonly framesPerRow: number = 4; // 4 animation frames
+  private currentDirection: 'up' | 'down' | 'left' | 'right' = 'down';
   
   private movement = {
     up: false,
@@ -47,6 +48,17 @@ export class Player {
     if (this.movement.left) this.vx -= this.speed;
     if (this.movement.right) this.vx += this.speed;
     
+    // Update movement direction based on strongest input
+    if (this.movement.up && Math.abs(this.vy) >= Math.abs(this.vx)) {
+      this.currentDirection = 'up';
+    } else if (this.movement.down && Math.abs(this.vy) >= Math.abs(this.vx)) {
+      this.currentDirection = 'down';
+    } else if (this.movement.left && Math.abs(this.vx) >= Math.abs(this.vy)) {
+      this.currentDirection = 'left';
+    } else if (this.movement.right && Math.abs(this.vx) >= Math.abs(this.vy)) {
+      this.currentDirection = 'right';
+    }
+    
     // Normalize diagonal movement
     const magnitude = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
     if (magnitude > this.speed) {
@@ -74,6 +86,13 @@ export class Player {
       this.vx = (dx / distance) * this.speed * 0.7; // AI slightly slower
       this.vy = (dy / distance) * this.speed * 0.7;
       
+      // Update direction based on AI movement
+      if (Math.abs(dy) > Math.abs(dx)) {
+        this.currentDirection = dy > 0 ? 'down' : 'up';
+      } else {
+        this.currentDirection = dx > 0 ? 'right' : 'left';
+      }
+      
       this.x += this.vx * deltaTime;
       this.y += this.vy * deltaTime;
       
@@ -93,13 +112,13 @@ export class Player {
   }
 
   public render(ctx: CanvasRenderingContext2D) {
-    // Try to use sprite if available
+    // Try to use directional sprite if available
     if (this.spriteManager) {
-      const sprite = this.spriteManager.getSpriteForTeamColor(this.color);
+      const sprite = this.spriteManager.getSpriteForTeamColorAndDirection(this.color, this.currentDirection);
       if (sprite && sprite.complete) {
         const spriteSize = 28; // Size to render the sprite
         
-        // Draw the sprite (no animation frames for now, just single sprite)
+        // Draw the directional sprite
         ctx.drawImage(
           sprite,
           this.x - spriteSize / 2,
