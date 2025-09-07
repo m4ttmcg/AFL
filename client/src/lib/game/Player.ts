@@ -1,3 +1,5 @@
+import { SpriteManager } from "./SpriteManager";
+
 export class Player {
   public x: number;
   public y: number;
@@ -9,6 +11,7 @@ export class Player {
   public number: number;
   public isControlled: boolean = false;
   public speed: number = 120;
+  private spriteManager?: SpriteManager;
   
   private movement = {
     up: false,
@@ -17,13 +20,14 @@ export class Player {
     right: false
   };
 
-  constructor(x: number, y: number, team: 'home' | 'away', color: string, textColor: string, number: number) {
+  constructor(x: number, y: number, team: 'home' | 'away', color: string, textColor: string, number: number, spriteManager?: SpriteManager) {
     this.x = x;
     this.y = y;
     this.team = team;
     this.color = color;
     this.textColor = textColor;
     this.number = number;
+    this.spriteManager = spriteManager;
   }
 
   public setMovement(direction: keyof typeof this.movement, active: boolean) {
@@ -65,7 +69,42 @@ export class Player {
   }
 
   public render(ctx: CanvasRenderingContext2D) {
-    // Player body
+    // Try to use sprite if available
+    if (this.spriteManager) {
+      const sprite = this.spriteManager.getSpriteForTeamColor(this.color);
+      if (sprite && sprite.complete) {
+        const spriteSize = 24; // Size to render the sprite
+        ctx.drawImage(
+          sprite,
+          this.x - spriteSize / 2,
+          this.y - spriteSize / 2,
+          spriteSize,
+          spriteSize
+        );
+        
+        // Player number overlay
+        ctx.fillStyle = this.textColor;
+        ctx.font = 'bold 8px Inter, monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 2;
+        ctx.strokeText(this.number.toString(), this.x, this.y + 8);
+        ctx.fillText(this.number.toString(), this.x, this.y + 8);
+        
+        // Controlled player indicator
+        if (this.isControlled) {
+          ctx.strokeStyle = '#ffff00';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.arc(this.x, this.y, 18, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        return;
+      }
+    }
+    
+    // Fallback to circle rendering if sprite not available
     ctx.fillStyle = this.color;
     ctx.beginPath();
     ctx.arc(this.x, this.y, 12, 0, Math.PI * 2);
