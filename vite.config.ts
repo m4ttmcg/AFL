@@ -14,6 +14,17 @@ export default defineConfig({
     runtimeErrorOverlay(),
     glsl(), // Add GLSL shader support
   ],
+  define: {
+    // Expose a stable asset version for cache-busting of public assets
+    __ASSET_VERSION__: JSON.stringify(
+      process.env.CF_PAGES_COMMIT_SHA ||
+        process.env.VERCEL_GIT_COMMIT_SHA ||
+        process.env.GITHUB_SHA ||
+        process.env.COMMIT_SHA ||
+        process.env.npm_package_version ||
+        Date.now().toString()
+    ),
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "client", "src"),

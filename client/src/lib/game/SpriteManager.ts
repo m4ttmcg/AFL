@@ -9,6 +9,8 @@ export class SpriteManager {
   }
 
   private loadSprites() {
+    // Use a per-deploy version string to bust CDN/browser caches for public assets
+    const VERSION = (import.meta as any).env?.VITE_ASSET_VERSION ?? __ASSET_VERSION__ ?? 'dev';
     const spriteFiles = {
       'player_red_up': '/textures/player_red_up.png',
       'player_red_down': '/textures/player_red_down.png',
@@ -41,7 +43,8 @@ export class SpriteManager {
           this.onAllLoaded();
         }
       };
-      img.src = path;
+      // Append version to force a fresh fetch when a new deploy occurs
+      img.src = `${path}?v=${VERSION}`;
       this.sprites.set(name, img);
     });
   }
